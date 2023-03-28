@@ -5,6 +5,9 @@ import os
 import string
 from contextlib import contextmanager
 
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
 from zope.interface import implementer
 from twisted.plugin import IPlugin
 from twisted.python import lockfile
@@ -82,6 +85,17 @@ class EventWriter(object):
         if name == "directory":
             self.directory = value
 
+    def update_slack(self):
+        client = WebClient(token='xoxb-508911196752-4693961803840-wKAel2vpKk3IqBHnLeYvp1uG')
+        try:
+            response = client.chat_postMessage(
+            channel="#candidates",
+            text=f"VOEvent Received: \n {event.raw_bytes.decode(event.encoding)}",
+            icon_emoji = ":zap:"
+            )
+            print(response)
+        except SlackApiError as e:
+            print("Error sending message: {}".format(e))
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
