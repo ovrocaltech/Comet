@@ -5,6 +5,11 @@ import os
 import string
 from contextlib import contextmanager
 
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
+import voeventparse
+
 from zope.interface import implementer
 from twisted.plugin import IPlugin
 from twisted.python import lockfile
@@ -82,6 +87,33 @@ class EventWriter(object):
         if name == "directory":
             self.directory = value
 
+    def update_slack(self):
+
+        # Load the VOEvent file
+        voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
+
+        with open('ivo__ca.chimenet.frb_FRBDETECTION20230202213124.xml', 'rb') as f:
+            voevent_bytes = f.read()
+            # Access the elements of the VOEvent packet
+            voevent_bytes = voevent_bytes.replace(b'<?xml version="1.0" encoding="UTF-8"?>', b'')
+            voevent = voeventparse.loads(voevent_bytes)
+
+            dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+
+            toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+
+            position = voeventparse.convenience.get_event_position(voevent)
+            
+            client = WebClient(token='xoxb-508911196752-4693961803840-wKAel2vpKk3IqBHnLeYvp1uG')
+            try:
+                response = client.chat_postMessage(
+                channel="#candidates",
+                text=f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
+                icon_emoji = ":zap:"
+                )
+                print(response)
+            except SlackApiError as e:
+                print("Error sending message: {}".format(e))
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
