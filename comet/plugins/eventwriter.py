@@ -78,8 +78,11 @@ class EventWriter(object):
         """
         Save an event to disk and update slack.
         """
-        self.update_slack(event)
-        self.update_relay(event)
+        # create and parse voevent
+        log.info("Creating voevent")
+        voevent = voeventparse.loads(event.raw_bytes.decode(event.encoding).replace(b'<?xml version="1.0" encoding="UTF-8"?>', b''))
+        self.update_slack(voevent)
+        self.update_relay(voevent)
 
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -95,11 +98,10 @@ class EventWriter(object):
         if name == "directory":
             self.directory = value
 
-    def update_slack(self, event):
+    def update_slack(self, voevent):
         """ parse VOEvent file and send a message to slack 
         """
         # Load the VOEvent file
-        voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
         dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
         toa = voeventparse.convenience.get_event_time_as_utc(voevent)
         position = voeventparse.convenience.get_event_position(voevent)
@@ -114,11 +116,10 @@ class EventWriter(object):
         except SlackApiError as e:
             print("Error sending message: {}".format(e))
 
-    def update_relay(self, event):
+    def update_relay(self, voevent):
         """ parse VOEvent file and send info to relay server
         """
         # Load the VOEvent file
-        voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
         dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
         toa = voeventparse.convenience.get_event_time_as_utc(voevent)
         position = voeventparse.convenience.get_event_position(voevent)
