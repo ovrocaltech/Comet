@@ -9,6 +9,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 import voeventparse
+from ovro_alert import alert_client
 
 from zope.interface import implementer
 from twisted.plugin import IPlugin
@@ -16,6 +17,9 @@ from twisted.python import lockfile
 
 from comet.icomet import IHandler, IHasOptions
 import comet.log as log
+
+
+dsac = alert_client.AlertClient('dsa')
 
 # Used when building filenames to avoid over-writing.
 FILENAME_PAD = "_"
@@ -75,6 +79,7 @@ class EventWriter(object):
         Save an event to disk and update slack.
         """
         self.update_slack(event)
+        self.update_relay(event)
 
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -108,6 +113,16 @@ class EventWriter(object):
             print(response)
         except SlackApiError as e:
             print("Error sending message: {}".format(e))
+
+    def update_relay(self, event):
+        """ parse VOEvent file and send info to relay server
+        """
+        # Load the VOEvent file
+        voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
+        dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+        toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+        position = voeventparse.convenience.get_event_position(voevent)
+        dsac.put("CHIME FRB", args={"dm": dm, "toa": toa, "position": position})
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
