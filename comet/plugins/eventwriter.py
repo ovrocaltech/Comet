@@ -19,7 +19,7 @@ import comet.log as log
 
 # Used when building filenames to avoid over-writing.
 FILENAME_PAD = "_"
-
+SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
 
 def string_to_filename(input_string):
     # Strip weird, confusing or special characters from input_string so that
@@ -98,7 +98,7 @@ class EventWriter(object):
         dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
         toa = voeventparse.convenience.get_event_time_as_utc(voevent)
         position = voeventparse.convenience.get_event_position(voevent)
-        client = WebClient(token='xoxb-508911196752-4693961803840-wKAel2vpKk3IqBHnLeYvp1uG')
+        client = WebClient(token=SLACK_TOKEN)
 
         # Post to slack
         try:
