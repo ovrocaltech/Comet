@@ -2,3 +2,6 @@
 *.pid
 *.pyc
 _trial_temp
+build
+ivo*
+twistd.log

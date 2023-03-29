@@ -9,6 +9,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 import voeventparse
+from ovro_alert import alert_client
 
 from zope.interface import implementer
 from twisted.plugin import IPlugin
@@ -17,9 +18,12 @@ from twisted.python import lockfile
 from comet.icomet import IHandler, IHasOptions
 import comet.log as log
 
+
+dsac = alert_client.AlertClient('dsa')
+
 # Used when building filenames to avoid over-writing.
 FILENAME_PAD = "_"
-
+SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
 
 def string_to_filename(input_string):
     # Strip weird, confusing or special characters from input_string so that
@@ -72,10 +76,14 @@ class EventWriter(object):
     # comet.utility.xml.xml_document.
     def __call__(self, event):
         """
-        Save an event to disk.
+        Save an event to disk and update slack.
         """
+        self.update_slack(event)
+        self.update_relay(event)
+
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
+
         with event_file(event.element.attrib["ivorn"], self.directory) as f:
             log.debug("Writing to %s" % (f.name,))
             f.write(event.raw_bytes.decode(event.encoding))
@@ -87,33 +95,34 @@ class EventWriter(object):
         if name == "directory":
             self.directory = value
 
-    def update_slack(self):
-
+    def update_slack(self, event):
+        """ parse VOEvent file and send a message to slack 
+        """
         # Load the VOEvent file
         voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
+        dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+        toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+        position = voeventparse.convenience.get_event_position(voevent)
+        client = WebClient(token=SLACK_TOKEN)
 
-        with open('ivo__ca.chimenet.frb_FRBDETECTION20230202213124.xml', 'rb') as f:
-            voevent_bytes = f.read()
-            # Access the elements of the VOEvent packet
-            voevent_bytes = voevent_bytes.replace(b'<?xml version="1.0" encoding="UTF-8"?>', b'')
-            voevent = voeventparse.loads(voevent_bytes)
+        # Post to slack
+        try:
+            response = client.chat_postMessage(channel="#candidates",
+                                               text=f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
+                                               icon_emoji = ":zap:")
+            print(response)
+        except SlackApiError as e:
+            print("Error sending message: {}".format(e))
 
-            dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
-
-            toa = voeventparse.convenience.get_event_time_as_utc(voevent)
-
-            position = voeventparse.convenience.get_event_position(voevent)
-            
-            client = WebClient(token='xoxb-508911196752-4693961803840-wKAel2vpKk3IqBHnLeYvp1uG')
-            try:
-                response = client.chat_postMessage(
-                channel="#candidates",
-                text=f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
-                icon_emoji = ":zap:"
-                )
-                print(response)
-            except SlackApiError as e:
-                print("Error sending message: {}".format(e))
+    def update_relay(self, event):
+        """ parse VOEvent file and send info to relay server
+        """
+        # Load the VOEvent file
+        voevent = voeventparse.load(event.raw_bytes.decode(event.encoding))
+        dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+        toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+        position = voeventparse.convenience.get_event_position(voevent)
+        dsac.put("CHIME FRB", args={"dm": dm, "toa": toa, "position": position})
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
