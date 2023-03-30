@@ -19,8 +19,6 @@ from comet.icomet import IHandler, IHasOptions
 import comet.log as log
 
 
-dsac = alert_client.AlertClient('dsa')
-
 # Used when building filenames to avoid over-writing.
 FILENAME_PAD = "_"
 SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
@@ -88,15 +86,8 @@ class EventWriter(object):
         # create voevent
         log.info("Creating voevent")
         voevent = voeventparse.loads(event.raw_bytes) 
-        try:
-            self.update_relay(voevent)
-        except Exception as e:
-            log.error(e)
-
-        try:
-            self.update_slack(voevent)
-        except Exception as e:
-            log.error(e)
+        self.update_relay(voevent)
+        self.update_slack(voevent)
 
     def get_options(self):
         return [("directory", self.directory, "Directory in which to save events")]
@@ -136,22 +127,22 @@ class EventWriter(object):
         """ parse VOEvent file and send info to relay server
         """
 
-        log.info("Sending to slack")
+        log.info("Sending to relay")
+
+        dsac = alert_client.AlertClient('dsa')
 
         role = voevent.get('role')
         if role != "test":
-            # Load the VOEvent file
-            log.info(voeventparse.convenience.get_grouped_params(voevent))
-
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
-            toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+            toa = voeventparse.convenience.get_event_time_as_utc(voevent).isoformat()
             position = voeventparse.convenience.get_event_position(voevent)
-            args = {"dm": dm, "toa": toa, "position": position}
+            args = {"dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}"}
         else:
             date = voevent.Who.find("Date")
             description = voevent.What.find("Description")
             args = {"role": role, "date": date, "description": description}
 
+        log.info("dsac.set()")
         dsac.set("CHIME FRB", args=args)
 
 # This instance of the handler is what actually constitutes our plugin.
