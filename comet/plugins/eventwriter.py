@@ -71,7 +71,6 @@ class EventWriter(object):
     def __init__(self):
         self.directory = os.getcwd()
         self.testcount = 0
-        self.starttime = time.time()
 
     # When the handler is called, it is passed an instance of
     # comet.utility.xml.xml_document.
@@ -92,7 +91,9 @@ class EventWriter(object):
         role = voevent.get('role')
 
         # send all non-tests, plus ever 24th test
-        if (role != 'test') or (self.testcount % 24):
+        if (role != 'test') or (not self.testcount % 24):
+            if self.testcount == 0 and role == 'test':  # reference time for first test
+                self.starttime = time.time()
             self.update_relay(voevent)
             self.update_slack(voevent)
 
