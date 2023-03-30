@@ -78,18 +78,18 @@ class EventWriter(object):
         """
         Save an event to disk and update slack.
         """
-        # create and parse voevent
-        log.info("Creating voevent")
-        voevent = voeventparse.loads(event.raw_bytes.decode(event.encoding).replace(b'<?xml version="1.0" encoding="UTF-8"?>', b''))
-        self.update_slack(voevent)
-        self.update_relay(voevent)
-
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
         with event_file(event.element.attrib["ivorn"], self.directory) as f:
             log.debug("Writing to %s" % (f.name,))
             f.write(event.raw_bytes.decode(event.encoding))
+
+        # create voevent
+        log.info("Creating voevent")
+        voevent = voeventparse.loads(event.raw_bytes.decode(event.encoding).replace(b'<?xml version="1.0" encoding="UTF-8"?>', b''))
+        self.update_relay(voevent)
+        self.update_slack(voevent)
 
     def get_options(self):
         return [("directory", self.directory, "Directory in which to save events")]
@@ -101,17 +101,24 @@ class EventWriter(object):
     def update_slack(self, voevent):
         """ parse VOEvent file and send a message to slack 
         """
-        # Load the VOEvent file
-        dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
-        toa = voeventparse.convenience.get_event_time_as_utc(voevent)
-        position = voeventparse.convenience.get_event_position(voevent)
+
         client = WebClient(token=SLACK_TOKEN)
+
+        role = voevent.get('role')
+        if role != "test":
+            # Load the VOEvent file
+            dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+            toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+            position = voeventparse.convenience.get_event_position(voevent)
+            message = f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
+        else:
+            date = voevent.Who.find("Date")
+            description = voevent.What.find("Description")
+            message = f"Parsed {role} event at {date} described as: {description}"
 
         # Post to slack
         try:
-            response = client.chat_postMessage(channel="#candidates",
-                                               text=f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
-                                               icon_emoji = ":zap:")
+            response = client.chat_postMessage(channel="#candidates", text=message, icon_emoji = ":zap:")
             print(response)
         except SlackApiError as e:
             print("Error sending message: {}".format(e))
@@ -119,11 +126,20 @@ class EventWriter(object):
     def update_relay(self, voevent):
         """ parse VOEvent file and send info to relay server
         """
-        # Load the VOEvent file
-        dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
-        toa = voeventparse.convenience.get_event_time_as_utc(voevent)
-        position = voeventparse.convenience.get_event_position(voevent)
-        dsac.put("CHIME FRB", args={"dm": dm, "toa": toa, "position": position})
+
+        role = voevent.get('role')
+        if role != "test":
+            # Load the VOEvent file
+            dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
+            toa = voeventparse.convenience.get_event_time_as_utc(voevent)
+            position = voeventparse.convenience.get_event_position(voevent)
+            args = {"dm": dm, "toa": toa, "position": position}
+        else:
+            date = voevent.Who.find("Date")
+            description = voevent.What.find("Description")
+            args = {"role": role, "date": date, "description": description}
+
+        dsac.put("CHIME FRB", args=args)
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
