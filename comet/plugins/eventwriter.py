@@ -138,8 +138,8 @@ class EventWriter(object):
             position = voeventparse.convenience.get_event_position(voevent)
             args = {"dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}"}
         else:
-            date = voevent.Who.find("Date")
-            description = voevent.What.find("Description")
+            date = voevent.Who.find("Date").text
+            description = voevent.What.find("Description").text
             args = {"role": role, "date": date, "description": description}
 
         log.info("dsac.set()")
