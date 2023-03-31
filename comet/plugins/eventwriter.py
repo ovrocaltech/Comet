@@ -10,7 +10,7 @@ from slack_sdk.errors import SlackApiError
 
 import voeventparse
 from ovro_alert import alert_client
-import time
+from astropy import time
 
 from zope.interface import implementer
 from twisted.plugin import IPlugin
@@ -93,7 +93,7 @@ class EventWriter(object):
         # send all non-tests, plus ever 24th test
         if (role != 'test') or (not self.testcount % 24):
             if self.testcount == 0 and role == 'test':  # reference time for first test
-                self.starttime = time.time()
+                self.starttime = time.Time.now().unix
             self.update_relay(voevent)
             self.update_slack(voevent)
 
@@ -122,11 +122,11 @@ class EventWriter(object):
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent)
             position = voeventparse.convenience.get_event_position(voevent)
-            message = f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
+            message = f"CHIME/FRB VOEvent Received: \n TOA: {toa} (MJD {time.Time(toa).mjd}) \n Event Position: {position.ra},{position.dec},{position.err} \n DM: {dm}"
         else:
             date = voevent.Who.find("Date")
             if self.testcount > 0:
-                testrate = ((time.time()-self.starttime)/3600)/self.testcount
+                testrate = ((time.Time.now().unix-self.starttime)/3600)/self.testcount
                 message = f"CHIME/FRB test report at {date}: received {self.testcount} events since start at rate of {testrate:.1f} per hour."
             else:
                 message = f"CHIME/FRB test report at {date}: received first test event and will report every 24th event."
