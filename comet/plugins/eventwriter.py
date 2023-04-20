@@ -117,20 +117,39 @@ class EventWriter(object):
         client = WebClient(token=SLACK_TOKEN)
 
         role = voevent.get('role')
-        if role != "test":
+        if role == "observation":
             # Load the VOEvent file
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent)
             position = voeventparse.convenience.get_event_position(voevent)
-            message = f"CHIME/FRB VOEvent Received: \n TOA: {toa} (MJD {time.Time(toa).mjd}) \n Event Position: {position.ra},{position.dec},{position.err} \n DM: {dm}"
-        else:
-            date = voevent.Who.find("Date")
-            if self.testcount > 0:
-                testrate = ((time.Time.now().unix-self.starttime)/3600)/self.testcount
-                message = f"CHIME/FRB test report at {date}: received {self.testcount} events since start at rate of {testrate:.1f} per hour."
-            else:
-                message = f"CHIME/FRB test report at {date}: received first test event and will report every 24th event."
+            params = voeventparse.convenience.get_grouped_params(voevent)
+            event_no = params['event parameters']['event_no']['value']
+            snr = params['event parameters']['snr']['value']
+            message = f"CHIME/FRB event {event_no}: \n MJD {time.Time(toa).mjd} \n Event Position: {position.ra:.1f},{position.dec:.1f},{position.err:.1f} \n DM: {dm:.1f} \n SNR: {snr:.1f}"
 
+            known = params['event parameters']['known_source_name']
+            if known is not '':
+                message += ' \n Associated with known source: {known}'
+
+        elif role == "utility":
+            # Load the VOEvent file
+            ivorn = voevent.get('ivorn')
+            if "RETRACTION" in ivorn:
+                message = f"CHIME/FRB retraction issued: {ivorn}"
+            else:
+                message = f"CHIME/FRB utility event issued (unknown reason)"
+
+        elif role == 'test':
+             if self.testcount > 0:
+                nhours = (time.Time.now().unix-self.starttime)/3600
+                testrate = self.testcount/nhours
+                message = f"CHIME/FRB test event: received {testrate:.1f} per hour in last day."
+                if nhours > 24:
+                    self.testcount = 0
+                    self.starttime = time.Time.now().unix
+             else:
+                 message = f"CHIME/FRB test event: will report events after 24hrs"
+ 
         log.info("Sending to slack")
 
         # Post to slack
