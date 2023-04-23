@@ -125,7 +125,7 @@ class EventWriter(object):
             params = voeventparse.convenience.get_grouped_params(voevent)
             event_no = params['event parameters']['event_no']['value']
             snr = params['event parameters']['snr']['value']
-            message = f"CHIME/FRB event {event_no}: \n MJD {time.Time(toa).mjd} \n Event Position: {position.ra:.1f},{position.dec:.1f},{position.err:.1f} \n DM: {dm:.1f} \n SNR: {snr:.1f}"
+            message = f"CHIME/FRB event {event_no}: \n MJD {time.Time(toa).mjd} \n Event Position: {position.ra:.1f},{position.dec:.1f},{position.err:.1f} \n DM: {float(dm):.1f} \n SNR: {float(snr):.1f}"
 
             known = params['event parameters']['known_source_name']
             if known is not '':
