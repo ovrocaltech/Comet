@@ -10,7 +10,7 @@ from slack_sdk.errors import SlackApiError
 
 import voeventparse
 from ovro_alert import alert_client
-import time
+from astropy import time
 
 from zope.interface import implementer
 from twisted.plugin import IPlugin
@@ -93,7 +93,7 @@ class EventWriter(object):
         # send all non-tests, plus ever 24th test
         if (role != 'test') or (not self.testcount % 24):
             if self.testcount == 0 and role == 'test':  # reference time for first test
-                self.starttime = time.time()
+                self.starttime = time.Time.now().unix
             self.update_relay(voevent)
             self.update_slack(voevent)
 
@@ -117,20 +117,39 @@ class EventWriter(object):
         client = WebClient(token=SLACK_TOKEN)
 
         role = voevent.get('role')
-        if role != "test":
+        if role == "observation":
             # Load the VOEvent file
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent)
             position = voeventparse.convenience.get_event_position(voevent)
-            message = f"CHIME/FRB VOEvent Received: \n TOA: {toa} \n Event Position: {position} \n DM: {dm}",
-        else:
-            date = voevent.Who.find("Date")
-            if self.testcount > 0:
-                testrate = ((time.time()-self.starttime)/3600)/self.testcount
-                message = f"CHIME/FRB test report at {date}: received {self.testcount} events since start at rate of {testrate:.1f} per hour."
-            else:
-                message = f"CHIME/FRB test report at {date}: received first test event and will report every 24th event."
+            params = voeventparse.convenience.get_grouped_params(voevent)
+            event_no = params['event parameters']['event_no']['value']
+            snr = params['event parameters']['snr']['value']
+            message = f"CHIME/FRB event {event_no}: \n MJD {time.Time(toa).mjd} \n Event Position: {position.ra:.1f},{position.dec:.1f},{position.err:.1f} \n DM: {float(dm):.1f} \n SNR: {float(snr):.1f}"
 
+            known = params['event parameters']['known_source_name']['value']
+            if known is not '':
+                message += f' \n Associated with known source: {known}'
+
+        elif role == "utility":
+            # Load the VOEvent file
+            ivorn = voevent.get('ivorn')
+            if "RETRACTION" in ivorn:
+                message = f"CHIME/FRB retraction issued: {ivorn}"
+            else:
+                message = f"CHIME/FRB utility event issued (unknown reason)"
+
+        elif role == 'test':
+             if self.testcount > 0:
+                nhours = (time.Time.now().unix-self.starttime)/3600
+                testrate = self.testcount/nhours
+                message = f"CHIME/FRB test event: received {testrate:.1f} per hour in last day."
+                if nhours > 24:
+                    self.testcount = 0
+                    self.starttime = time.Time.now().unix
+             else:
+                 message = f"CHIME/FRB test event: will report events after 24hrs"
+ 
         log.info("Sending to slack")
 
         # Post to slack
@@ -149,12 +168,12 @@ class EventWriter(object):
         dsac = alert_client.AlertClient('dsa')
 
         role = voevent.get('role')
-        if role != "test":
+        if role == "observation":
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent).isoformat()
             position = voeventparse.convenience.get_event_position(voevent)
             args = {"dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}"}
-        else:
+        elif role == "test":
             date = voevent.Who.find("Date").text
             description = voevent.What.find("Description").text
             args = {"role": role, "date": date, "description": description}
