@@ -168,12 +168,12 @@ class EventWriter(object):
         dsac = alert_client.AlertClient('dsa')
 
         role = voevent.get('role')
-        if role != "test":
+        if role == "observation":
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent).isoformat()
             position = voeventparse.convenience.get_event_position(voevent)
             args = {"dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}"}
-        else:
+        elif role == "test":
             date = voevent.Who.find("Date").text
             description = voevent.What.find("Description").text
             args = {"role": role, "date": date, "description": description}
