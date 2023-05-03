@@ -167,7 +167,8 @@ class EventWriter(object):
 
         dsac = alert_client.AlertClient('dsa')
         lwac = alert_client.AlertClient('lwa')
-
+        chimec = alert_client.AlertClient('chime')
+        
         role = voevent.get('role')
         if role == "observation":
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
@@ -182,6 +183,7 @@ class EventWriter(object):
         log.info("Set to relay")
         dsac.set("CHIME FRB", args=args)
         lwac.set("powerbeam", args=args)
+        chimec.set(role, args=args)
 
 # This instance of the handler is what actually constitutes our plugin.
 save_event = EventWriter()
