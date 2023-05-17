@@ -81,14 +81,15 @@ class EventWriter(object):
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
 
-        with event_file(event.element.attrib["ivorn"], self.directory) as f:
-            log.info("Writing to %s" % (f.name,))
-            f.write(event.raw_bytes.decode(event.encoding))
-
         # create voevent
         log.info("Creating voevent")
         voevent = voeventparse.loads(event.raw_bytes) 
         role = voevent.get('role')
+
+        if role == 'observation':
+            with event_file(event.element.attrib["ivorn"], self.directory) as f:
+                log.info("Writing to %s" % (f.name,))
+                f.write(event.raw_bytes.decode(event.encoding))
 
         # send all non-tests, plus ever 24th test
         if (role != 'test') or (not self.testcount % 24):
@@ -174,7 +175,8 @@ class EventWriter(object):
             dm = voeventparse.convenience.get_grouped_params(voevent)['event parameters']['dm']['value']
             toa = voeventparse.convenience.get_event_time_as_utc(voevent).isoformat()
             position = voeventparse.convenience.get_event_position(voevent)
-            args = {"dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}"}
+            known = params['event parameters']['known_source_name']['value']
+            args = {"role": role, "dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}", "known": known}
         elif role == "test":
             date = voevent.Who.find("Date").text
             description = voevent.What.find("Description").text
