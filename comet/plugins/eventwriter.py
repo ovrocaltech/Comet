@@ -22,7 +22,7 @@ import comet.log as log
 
 # Used when building filenames to avoid over-writing.
 FILENAME_PAD = "_"
-SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
+token = os.environ.get("SLACK_TOKEN_DSA")
 
 def string_to_filename(input_string):
     # Strip weird, confusing or special characters from input_string so that
@@ -115,7 +115,7 @@ class EventWriter(object):
 
         log.info("Parsing event for slack")
 
-        client = WebClient(token=SLACK_TOKEN)
+        client = WebClient(token=token)
 
         role = voevent.get('role')
         if role == "observation":
