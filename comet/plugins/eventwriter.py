@@ -86,10 +86,10 @@ class EventWriter(object):
         voevent = voeventparse.loads(event.raw_bytes) 
         role = voevent.get('role')
 
-        if role == 'observation':
-            with event_file(event.element.attrib["ivorn"], self.directory) as f:
-                log.info("Writing to %s" % (f.name,))
-                f.write(event.raw_bytes.decode(event.encoding))
+#        if role == 'observation':
+        with event_file(event.element.attrib["ivorn"], self.directory) as f:
+            log.info("Writing to %s" % (f.name,))
+            f.write(event.raw_bytes.decode(event.encoding))
 
         # send all non-tests, plus ever 24th test
         if (role != 'test') or (not self.testcount % 24):
