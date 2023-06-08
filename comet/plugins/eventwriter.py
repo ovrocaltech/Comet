@@ -97,6 +97,7 @@ class EventWriter(object):
                 self.starttime = time.Time.now().unix
             self.update_relay(voevent)
             self.update_slack(voevent)
+            log.info('after update_slack')
 
         if role == 'test':
             log.info("Incrementing test counter")
@@ -115,7 +116,7 @@ class EventWriter(object):
 
         log.info("Parsing event for slack")
 
-        client = WebClient(token=token)
+        slack_client = WebClient(token=token)
 
         role = voevent.get('role')
         if role == "observation":
@@ -151,13 +152,13 @@ class EventWriter(object):
              else:
                  message = f"CHIME/FRB test event: will report events after 24hrs"
  
-        log.info("Sending to slack")
+        log.info(f"Sending message to slack: {message}")
 
         # Post to slack
         try:
-            response = client.chat_postMessage(channel="#candidates", text=message, icon_emoji = ":zap:")
+            response = slack_client.chat_postMessage(channel="#candidates", text=message, icon_emoji = ":zap:")
             log.info(response)
-        except SlackApiError as e:
+        except Exception as e: # SlackApiError as e:
             log.error("Error sending message: {}".format(e))
 
     def update_relay(self, voevent):
