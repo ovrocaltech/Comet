@@ -175,8 +175,10 @@ class EventWriter(object):
             toa = voeventparse.convenience.get_event_time_as_utc(voevent).isoformat()
             position = voeventparse.convenience.get_event_position(voevent)
             params = voeventparse.convenience.get_grouped_params(voevent)
+            event_no = params['event parameters']['event_no']['value']
             known = params['event parameters']['known_source_name']['value']
-            args = {"role": role, "dm": dm, "toa": toa, "position": f"{position.ra},{position.dec},{position.err}", "known": known}
+            args = {"role": role, "event_no": event_no, "dm": dm, "toa": toa,
+                    "position": f"{position.ra},{position.dec},{position.err}", "known": known}
         elif role == "test":
             date = voevent.Who.find("Date").text
             description = voevent.What.find("Description").text
